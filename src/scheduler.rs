@@ -40,7 +40,6 @@ async fn schedule_task(ctx: SerenityContext, task: Box<dyn Task>) {
         tokio::time::sleep(next_run_in).await;
 
         debug!("Running task {}", task.name());
-        tokio::time::sleep(next_run_in).await;
         if let Err(e) = task.run(ctx.clone()).await {
             error!("Could not run task {}, error {}", task.name(), e);
         }
