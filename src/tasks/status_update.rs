@@ -165,10 +165,10 @@ async fn collect_updates(channel_ids: &[ChannelId], ctx: &Context) -> anyhow::Re
                 valid_updates.extend(messages.into_iter().filter(|msg| {
                     let content = msg.content.to_lowercase();
                     (content.contains("namah shivaya")
-                        && content.contains("regards")
+                    && content.contains("regards")
                         && msg.timestamp >= yesterday_five_pm.into())
                         || (content.contains("regards")
-                            && msg.author.name == "amanoslean"
+                            && (msg.author.name == "amanoslean" || msg.author.name == "mouli7666")
                             && msg.timestamp >= yesterday_five_pm.into())
                 }));
             }
@@ -202,7 +202,7 @@ async fn collect_updates(channel_ids: &[ChannelId], ctx: &Context) -> anyhow::Re
                         && content.contains("regards")
                         && msg.timestamp >= yesterday_five_pm.into())
                         || (content.contains("regards")
-                            && msg.author.name == "amanoslean"
+                            && (msg.author.name == "amanoslean" || msg.author.name == "mouli7666")
                             && msg.timestamp >= yesterday_five_pm.into())
                 }));
             }
