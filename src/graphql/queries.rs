@@ -84,6 +84,7 @@ pub async fn increment_streak(member: &mut Member) -> anyhow::Result<()> {
         mutation {{
             incrementStreak(input: {{ memberId: {} }}) {{
                 currentStreak
+                maxStreak
             }}
         }}"#,
         member.member_id
@@ -103,24 +104,31 @@ pub async fn increment_streak(member: &mut Member) -> anyhow::Result<()> {
             response.status()
         ));
     }
-    debug!("Response: {:?}", response.text().await);
+    let response_json: serde_json::Value = response
+        .json()
+        .await
+        .context("Failed to parse response JSON")?;
+    debug!("Response: {}", response_json);
 
-    // Handle the streak vector
-    if member.streak.is_empty() {
-        // If the streak vector is empty, add a new Streak object with both values set to 1
-        member.streak.push(Streak {
-            current_streak: 1,
-            max_streak: 1,
-        });
-    } else {
-        // Otherwise, increment the current_streak for each Streak and update max_streak if necessary
-        for streak in &mut member.streak {
-            streak.current_streak += 1;
-            if streak.current_streak > streak.max_streak {
-                streak.max_streak = streak.current_streak;
+    if let Some(data) = response_json
+        .get("data")
+        .and_then(|data| data.get("incrementStreak"))
+    {
+        let current_streak = data.get("currentStreak").and_then(|v| v.as_i64()).ok_or_else(|| anyhow!("current_streak was parsed as None"))? as i32;
+        let max_streak = data.get("maxStreak").and_then(|v| v.as_i64()).ok_or_else(|| anyhow!("max_streak was parsed as None"))? as i32;
+
+        if member.streak.is_empty() {
+            member.streak.push(Streak { current_streak, max_streak });
+        } else {
+            for streak in &mut member.streak {
+                streak.current_streak = current_streak;
+                streak.max_streak = max_streak;
             }
         }
+    } else {
+        return Err(anyhow!("Failed to access data from response: {}", response_json));
     }
+
 
     Ok(())
 }
@@ -174,15 +182,12 @@ pub async fn reset_streak(member: &mut Member) -> anyhow::Result<()> {
                 .and_then(|v| v.as_i64())
                 .ok_or_else(|| anyhow!("max_streak was parsed as None"))? as i32;
 
-        // Update the member's streak vector
         if member.streak.is_empty() {
-            // If the streak vector is empty, initialize it with the returned values
             member.streak.push(Streak {
                 current_streak,
                 max_streak,
             });
         } else {
-            // Otherwise, update the first streak entry
             for streak in &mut member.streak {
                 streak.current_streak = current_streak;
                 streak.max_streak = max_streak;
