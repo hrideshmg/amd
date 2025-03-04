@@ -25,7 +25,6 @@ pub struct Streak {
     pub max_streak: i32,
 }
 
-/// Represents a record of the Member relation in [Root][https://www.github.com/amfoss/root].
 #[derive(Clone, Debug, Deserialize)]
 pub struct Member {
     #[serde(rename = "memberId")]

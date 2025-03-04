@@ -15,17 +15,13 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-/// Contains all the commands for the bot.
 mod commands;
-/// Interact with [Root's](https://www.github.com/amfoss/root) GraphQL interace.
 mod graphql;
-/// Contains Discord IDs that may be needed across the bot.
 mod ids;
 /// This module is a simple cron equivalent. It spawns threads for the [`Task`]s that need to be completed.
 mod scheduler;
 /// A trait to define a job that needs to be executed regularly, for example checking for status updates daily.
 mod tasks;
-/// Misc. helper functions that don't really have a place anywhere else.
 mod utils;
 
 use anyhow::Context as _;
@@ -59,8 +55,6 @@ pub struct Data {
     pub log_reload_handle: ReloadHandle,
 }
 
-/// This function is responsible for adding all the (emoji, role_id) pairs used in the
-/// `event_handler` to Data
 pub fn populate_data_with_reaction_roles(data: &mut Data) {
     let roles = [
         (
@@ -97,7 +91,6 @@ pub fn populate_data_with_reaction_roles(data: &mut Data) {
         .extend::<HashMap<ReactionType, RoleId>>(roles.into());
 }
 
-/// Abstraction over initializing the global subscriber for tracing depending on whether it's in production or dev.
 fn setup_tracing(env: &str, enable_libraries: bool) -> anyhow::Result<ReloadHandle> {
     let crate_name = env!("CARGO_CRATE_NAME");
     let (filter, reload_handle) =
@@ -205,7 +198,6 @@ async fn main() -> Result<(), Error> {
     Ok(())
 }
 
-/// Handles various events from Discord, such as reactions.
 async fn event_handler(
     ctx: &SerenityContext,
     event: &FullEvent,
@@ -225,7 +217,6 @@ async fn event_handler(
     Ok(())
 }
 
-/// Handles adding or removing roles based on reactions.
 async fn handle_reaction(ctx: &SerenityContext, reaction: &Reaction, data: &Data, is_add: bool) {
     if !is_relevant_reaction(reaction.message_id, &reaction.emoji, data) {
         return;
@@ -261,7 +252,6 @@ async fn handle_reaction(ctx: &SerenityContext, reaction: &Reaction, data: &Data
     }
 }
 
-/// Helper function to check if a reaction was made to [`ids::ROLES_MESSAGE_ID`] and if [`Data::reaction_roles`] contains a relevant (emoji, role) pair.
 fn is_relevant_reaction(message_id: MessageId, emoji: &ReactionType, data: &Data) -> bool {
     message_id == MessageId::new(ROLES_MESSAGE_ID) && data.reaction_roles.contains_key(emoji)
 }

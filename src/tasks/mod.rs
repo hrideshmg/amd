@@ -25,8 +25,7 @@ use tokio::time::Duration;
 
 /// A [`Task`] is any job that needs to be executed on a regular basis.
 /// A task has a function [`Task::run_in`] that returns the time till the
-/// next ['Task::run`] is run. It also has a [`Task::name`] that can be used
-/// in the future to display to the end user.
+/// next ['Task::run`] is run.
 #[async_trait]
 pub trait Task: Send + Sync {
     fn name(&self) -> &str;
