@@ -91,14 +91,22 @@ pub fn populate_data_with_reaction_roles(data: &mut Data) {
         .extend::<HashMap<ReactionType, RoleId>>(roles.into());
 }
 
-fn setup_tracing(env: &str, enable_libraries: bool) -> anyhow::Result<ReloadHandle> {
+fn setup_tracing() -> anyhow::Result<ReloadHandle> {
+    let env =
+        std::env::var("AMD_RUST_ENV").context("RUST_ENV was not found in the ENV")?;
+    let enable_debug_libraries_string = std::env::var("ENABLE_DEBUG_LIBRARIES")
+        .context("ENABLE_DEBUG_LIBRARIES was not found in the ENV")?;
+    let enable_debug_libraries: bool = enable_debug_libraries_string
+        .parse()
+        .context("Failed to parse ENABLE_DEBUG_LIBRARIES")?;
     let crate_name = env!("CARGO_CRATE_NAME");
+
     let (filter, reload_handle) =
-        reload::Layer::new(EnvFilter::new(if env == "production" && enable_libraries {
+        reload::Layer::new(EnvFilter::new(if env == "production" && enable_debug_libraries {
             "info".to_string()
-        } else if env == "production" && !enable_libraries {
+        } else if env == "production" && !enable_debug_libraries {
             format!("{crate_name}=info")
-        } else if enable_libraries {
+        } else if enable_debug_libraries {
             "trace".to_string()
         } else {
             format!("{crate_name}=trace")
@@ -133,15 +141,8 @@ fn setup_tracing(env: &str, enable_libraries: bool) -> anyhow::Result<ReloadHand
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     dotenv::dotenv().ok();
-    let is_production =
-        std::env::var("AMD_RUST_ENV").context("RUST_ENV was not found in the ENV")?;
-    let enable_debug_libraries_string = std::env::var("ENABLE_DEBUG_LIBRARIES")
-        .context("ENABLE_DEBUG_LIBRARIES was not found in the ENV")?;
-    let enable_debug_libraries: bool = enable_debug_libraries_string
-        .parse()
-        .context("Failed to parse ENABLE_DEBUG_LIBRARIES")?;
     let reload_handle =
-        setup_tracing(&is_production, enable_debug_libraries).context("Failed to setup tracing")?;
+        setup_tracing().context("Failed to setup tracing")?;
 
     info!("Tracing initialized. Continuing main...");
     let mut data = Data {
