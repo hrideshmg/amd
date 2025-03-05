@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 mod commands;
 mod graphql;
 mod ids;
+mod reaction_roles;
 /// This module is a simple cron equivalent. It spawns threads for the [`Task`]s that need to be completed.
 mod scheduler;
 /// A trait to define a job that needs to be executed regularly, for example checking for status updates daily.
@@ -26,24 +27,20 @@ mod utils;
 
 use anyhow::Context as _;
 use poise::{Context as PoiseContext, Framework, FrameworkOptions, PrefixFrameworkOptions};
+use reaction_roles::{handle_reaction, populate_data_with_reaction_roles};
 use serenity::{
-    all::{Reaction, ReactionType, RoleId, UserId},
+    all::{ReactionType, RoleId, UserId},
     client::{Context as SerenityContext, FullEvent},
-    model::{gateway::GatewayIntents, id::MessageId},
+    model::gateway::GatewayIntents,
 };
 use tokio::sync::RwLock;
-use tracing::{debug, error, info};
+use tracing::info;
 use tracing_subscriber::{fmt, layer::SubscriberExt, reload, EnvFilter, Registry};
 
 use std::{
     collections::{HashMap, HashSet},
     fs::File,
     sync::Arc,
-};
-
-use ids::{
-    AI_ROLE_ID, ARCHIVE_ROLE_ID, DEVOPS_ROLE_ID, MOBILE_ROLE_ID, RESEARCH_ROLE_ID,
-    ROLES_MESSAGE_ID, SYSTEMS_ROLE_ID, WEB_ROLE_ID,
 };
 
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -55,45 +52,8 @@ pub struct Data {
     pub log_reload_handle: ReloadHandle,
 }
 
-pub fn populate_data_with_reaction_roles(data: &mut Data) {
-    let roles = [
-        (
-            ReactionType::Unicode("📁".to_string()),
-            RoleId::new(ARCHIVE_ROLE_ID),
-        ),
-        (
-            ReactionType::Unicode("📱".to_string()),
-            RoleId::new(MOBILE_ROLE_ID),
-        ),
-        (
-            ReactionType::Unicode("⚙️".to_string()),
-            RoleId::new(SYSTEMS_ROLE_ID),
-        ),
-        (
-            ReactionType::Unicode("🤖".to_string()),
-            RoleId::new(AI_ROLE_ID),
-        ),
-        (
-            ReactionType::Unicode("📜".to_string()),
-            RoleId::new(RESEARCH_ROLE_ID),
-        ),
-        (
-            ReactionType::Unicode("🚀".to_string()),
-            RoleId::new(DEVOPS_ROLE_ID),
-        ),
-        (
-            ReactionType::Unicode("🌐".to_string()),
-            RoleId::new(WEB_ROLE_ID),
-        ),
-    ];
-
-    data.reaction_roles
-        .extend::<HashMap<ReactionType, RoleId>>(roles.into());
-}
-
 fn setup_tracing() -> anyhow::Result<ReloadHandle> {
-    let env =
-        std::env::var("AMD_RUST_ENV").context("RUST_ENV was not found in the ENV")?;
+    let env = std::env::var("AMD_RUST_ENV").context("RUST_ENV was not found in the ENV")?;
     let enable_debug_libraries_string = std::env::var("ENABLE_DEBUG_LIBRARIES")
         .context("ENABLE_DEBUG_LIBRARIES was not found in the ENV")?;
     let enable_debug_libraries: bool = enable_debug_libraries_string
@@ -101,8 +61,8 @@ fn setup_tracing() -> anyhow::Result<ReloadHandle> {
         .context("Failed to parse ENABLE_DEBUG_LIBRARIES")?;
     let crate_name = env!("CARGO_CRATE_NAME");
 
-    let (filter, reload_handle) =
-        reload::Layer::new(EnvFilter::new(if env == "production" && enable_debug_libraries {
+    let (filter, reload_handle) = reload::Layer::new(EnvFilter::new(
+        if env == "production" && enable_debug_libraries {
             "info".to_string()
         } else if env == "production" && !enable_debug_libraries {
             format!("{crate_name}=info")
@@ -110,7 +70,8 @@ fn setup_tracing() -> anyhow::Result<ReloadHandle> {
             "trace".to_string()
         } else {
             format!("{crate_name}=trace")
-        }));
+        },
+    ));
 
     if env != "production" {
         let subscriber = tracing_subscriber::registry()
@@ -141,8 +102,7 @@ fn setup_tracing() -> anyhow::Result<ReloadHandle> {
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     dotenv::dotenv().ok();
-    let reload_handle =
-        setup_tracing().context("Failed to setup tracing")?;
+    let reload_handle = setup_tracing().context("Failed to setup tracing")?;
 
     info!("Tracing initialized. Continuing main...");
     let mut data = Data {
@@ -216,43 +176,4 @@ async fn event_handler(
     }
 
     Ok(())
-}
-
-async fn handle_reaction(ctx: &SerenityContext, reaction: &Reaction, data: &Data, is_add: bool) {
-    if !is_relevant_reaction(reaction.message_id, &reaction.emoji, data) {
-        return;
-    }
-
-    debug!("Handling {:?} from {:?}.", reaction.emoji, reaction.user_id);
-
-    // TODO Log these errors
-    let Some(guild_id) = reaction.guild_id else {
-        return;
-    };
-    let Some(user_id) = reaction.user_id else {
-        return;
-    };
-    let Ok(member) = guild_id.member(ctx, user_id).await else {
-        return;
-    };
-    let Some(role_id) = data.reaction_roles.get(&reaction.emoji) else {
-        return;
-    };
-
-    let result = if is_add {
-        member.add_role(&ctx.http, *role_id).await
-    } else {
-        member.remove_role(&ctx.http, *role_id).await
-    };
-
-    if let Err(e) = result {
-        error!(
-            "Could not handle {:?} from {:?}. Error: {}",
-            reaction.emoji, reaction.user_id, e
-        );
-    }
-}
-
-fn is_relevant_reaction(message_id: MessageId, emoji: &ReactionType, data: &Data) -> bool {
-    message_id == MessageId::new(ROLES_MESSAGE_ID) && data.reaction_roles.contains_key(emoji)
 }
