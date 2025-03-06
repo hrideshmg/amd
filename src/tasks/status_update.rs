@@ -223,11 +223,17 @@ async fn generate_embed(
 }
 
 fn format_members(members: &[Member]) -> String {
-    members
-        .iter()
-        .map(|member| format!("- {}\n", member.name))
-        .collect::<Vec<_>>()
-        .join("\n")
+    if members.len() <= 5 {
+        let list = members
+            .iter()
+            .map(|member| format!("- {}", member.name))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        format!("{}\n", list)
+    } else {
+        String::from("More than five members hold this record!")
+    }
 }
 
 fn format_defaulters(naughty_list: &GroupedMember) -> String {
